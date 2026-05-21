@@ -43,14 +43,32 @@ function doPost(e) {
   }
 }
 
-// ─── doGet: 最新センサーデータ or healthcheck ────────
+// ─── doGet: 最新センサーデータ / 診断 / healthcheck ──
 function doGet(e) {
   const action = e?.parameter?.action || '';
+
   if (action === 'latest') {
     const raw  = PropertiesService.getScriptProperties().getProperty(CONFIG.LATEST_KEY);
     const data = raw ? JSON.parse(raw) : { active: false };
     return _json(data);
   }
+
+  if (action === 'diag') {
+    const props    = PropertiesService.getScriptProperties();
+    const lastRow  = props.getProperty(CONFIG.LAST_ROW_KEY);
+    const ss       = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const logSheet = ss.getSheetByName(CONFIG.LOG_SHEET);
+    const subSheet = ss.getSheetByName(CONFIG.SUB_SHEET);
+    const subCount = subSheet ? Math.max(0, subSheet.getLastRow() - 1) : 0;
+    const raw      = props.getProperty(CONFIG.LATEST_KEY);
+    return _json({
+      lastProcessedRow: lastRow ? parseInt(lastRow) : null,
+      currentLastRow:   logSheet ? logSheet.getLastRow() : null,
+      subscriptionCount: subCount,
+      latestSensorData: raw ? JSON.parse(raw) : null,
+    });
+  }
+
   return _json({ status: 'ok' });
 }
 
@@ -99,10 +117,10 @@ function _processRow(sheet, row) {
   const tenun     = raceInfo.tenun;
 
   const isHit =
-    grade     === 'a-kyu' &&
-    windSpeed >= 1.5      &&
-    windSpeed <  3.1      &&
-    tenun     === 33;
+    grade     === 'a-kyu'  &&
+    windSpeed >= 1.5       &&
+    windSpeed <  3.1       &&
+    Number(tenun) === 33;  // 文字列 "33" も許容
 
   if (!isHit) return;
 
@@ -147,7 +165,7 @@ function _processRow(sheet, row) {
 }
 
 // ─── Push送信 ────────────────────────────────────────
-function _sendPushToAll() {
+function _sendPushToAll(payload) {
   const ss    = SpreadsheetApp.openById(CONFIG.SHEET_ID);
   const sheet = ss.getSheetByName(CONFIG.SUB_SHEET);
   if (!sheet) return;
@@ -175,8 +193,10 @@ function _sendVapidPush(endpoint) {
   const resp = UrlFetchApp.fetch(endpoint, {
     method: 'post',
     headers: {
-      'Authorization': `vapid t=${jwt},k=${pubKey}`,
-      'TTL': '86400',
+      'Authorization':  `vapid t=${jwt},k=${pubKey}`,
+      'TTL':            '86400',
+      'Content-Type':   'application/octet-stream',
+      'Content-Length': '0',
     },
     muteHttpExceptions: true,
   });
