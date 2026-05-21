@@ -197,18 +197,18 @@ function _createVapidJwt(endpoint) {
 // ─── P-256 ECDSA（RFC 6979、GAS V8 BigInt）───────────
 function _p256Sign(privateKeyB64u, message) {
   // P-256 パラメータ
-  const p  = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFn;
-  const a  = p - 3n;
-  const n  = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551n;
-  const Gx = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296n;
-  const Gy = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5n;
+  const p  = BigInt('0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF');
+  const a  = p - BigInt(3);
+  const n  = BigInt('0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551');
+  const Gx = BigInt('0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296');
+  const Gy = BigInt('0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5');
   const G  = [Gx, Gy];
 
   // フィールド演算
-  const _fm = (x, m) => { let r = x % m; return r < 0n ? r + m : r; };
+  const _fm = (x, m) => { let r = x % m; return r < BigInt(0) ? r + m : r; };
   const _fi = (x, m) => {
-    let [r0, r1, s0, s1] = [_fm(x, m), m, 1n, 0n];
-    while (r1 !== 0n) {
+    let [r0, r1, s0, s1] = [_fm(x, m), m, BigInt(1), BigInt(0)];
+    while (r1 !== BigInt(0)) {
       const q = r0 / r1;
       [r0, r1] = [r1, r0 - q * r1];
       [s0, s1] = [s1, s0 - q * s1];
@@ -222,8 +222,8 @@ function _p256Sign(privateKeyB64u, message) {
     const [x1, y1] = P, [x2, y2] = Q;
     if (x1 === x2) {
       if (y1 !== y2) return null;
-      const m = _fm(3n * x1 * x1 + a, p) * _fi(2n * y1, p) % p;
-      const x3 = _fm(m * m - 2n * x1, p);
+      const m = _fm(BigInt(3) * x1 * x1 + a, p) * _fi(BigInt(2) * y1, p) % p;
+      const x3 = _fm(m * m - BigInt(2) * x1, p);
       return [x3, _fm(m * (x1 - x3) - y1, p)];
     }
     const m  = _fm(y2 - y1, p) * _fi(_fm(x2 - x1, p), p) % p;
@@ -232,7 +232,7 @@ function _p256Sign(privateKeyB64u, message) {
   };
   const _mul = (k, P) => {
     let R = null, Q = P;
-    while (k > 0n) { if (k & 1n) R = _add(R, Q); Q = _add(Q, Q); k >>= 1n; }
+    while (k > BigInt(0)) { if (k & BigInt(1)) R = _add(R, Q); Q = _add(Q, Q); k >>= BigInt(1); }
     return R;
   };
 
@@ -279,7 +279,7 @@ function _p256Sign(privateKeyB64u, message) {
     for (let i = 0; i < 100; i++) {
       V = _hmac(K, V);
       const k = _fromBytes(V);
-      if (k >= 1n && k < n) return k;
+      if (k >= BigInt(1) && k < n) return k;
       K = _hmac(K, _cat(V, new Uint8Array([0])));
       V = _hmac(K, V);
     }
