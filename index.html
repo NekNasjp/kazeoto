@@ -230,21 +230,20 @@
   document.getElementById('btn-notif').addEventListener('click', subscribe);
 
   navigator.serviceWorker?.ready.then(async reg => {
-    let sub = await reg.pushManager.getSubscription();
-    // subscription が消えていて通知許可済みなら自動再購読
-    if (!sub && Notification.permission === 'granted') {
-      try {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
-        });
-      } catch (_) {}
-    }
-    if (!sub) return;
+    if (Notification.permission !== 'granted') return;
+    // 失効 endpoint の 410 ループを断ち切るため既存を破棄して新規作成
+    const old = await reg.pushManager.getSubscription();
+    if (old) await old.unsubscribe().catch(() => {});
+    let sub;
+    try {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    } catch (_) { return; }
     const btn = document.getElementById('btn-notif');
     btn.textContent = '✅ 通知有効';
     btn.classList.add('subscribed');
-    // GAS シートへ登録（シートから削除された場合・新デプロイ後も対応）
     const json = sub.toJSON();
     fetch(GAS_URL, {
       method: 'POST',
