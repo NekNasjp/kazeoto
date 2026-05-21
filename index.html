@@ -141,8 +141,14 @@
       navigator.serviceWorker.addEventListener('message', e => {
         if (e.data?.type === 'SENSOR_HIT') showPanel(e.data.data);
       });
-      const reg = await navigator.serviceWorker.ready;
-      reg.active?.postMessage({ type: 'CLIENT_READY' });
+      // 通知タップ起動チェック: GAS 最新データが10分以内なら発動パネルを表示
+      try {
+        const res  = await fetch(`${GAS_URL}?action=latest&t=${Date.now()}`);
+        const data = await res.json();
+        if (data.active && data.ts && (Date.now() - new Date(data.ts).getTime() < 10 * 60 * 1000)) {
+          showPanel(data);
+        }
+      } catch (_) {}
     } catch (_) {}
   }
 
