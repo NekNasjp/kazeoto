@@ -43,8 +43,26 @@ function doPost(e) {
   }
 }
 
+// ─── onChange トリガー自動設定 ───────────────────────
+function _ensureTrigger() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('triggerConfigured') === 'true') return;
+  try {
+    const existing = ScriptApp.getProjectTriggers()
+      .filter(t => t.getHandlerFunction() === 'checkNewRows');
+    if (existing.length === 0) {
+      ScriptApp.newTrigger('checkNewRows')
+        .forSpreadsheet(SpreadsheetApp.openById(CONFIG.SHEET_ID))
+        .onChange()
+        .create();
+    }
+    props.setProperty('triggerConfigured', 'true');
+  } catch (_) {}
+}
+
 // ─── doGet: 最新センサーデータ / 診断 / healthcheck ──
 function doGet(e) {
+  _ensureTrigger();
   const action = e?.parameter?.action || '';
 
   if (action === 'latest') {
@@ -61,11 +79,14 @@ function doGet(e) {
     const subSheet = ss.getSheetByName(CONFIG.SUB_SHEET);
     const subCount = subSheet ? Math.max(0, subSheet.getLastRow() - 1) : 0;
     const raw      = props.getProperty(CONFIG.LATEST_KEY);
+    const triggerCount = ScriptApp.getProjectTriggers()
+      .filter(t => t.getHandlerFunction() === 'checkNewRows').length;
     return _json({
-      lastProcessedRow: lastRow ? parseInt(lastRow) : null,
-      currentLastRow:   logSheet ? logSheet.getLastRow() : null,
+      lastProcessedRow:  lastRow ? parseInt(lastRow) : null,
+      currentLastRow:    logSheet ? logSheet.getLastRow() : null,
       subscriptionCount: subCount,
-      latestSensorData: raw ? JSON.parse(raw) : null,
+      triggerCount,
+      latestSensorData:  raw ? JSON.parse(raw) : null,
     });
   }
 
