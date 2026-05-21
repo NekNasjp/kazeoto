@@ -1,4 +1,5 @@
-const CACHE_NAME = 'sv-k9z4a';
+const CACHE_NAME = 'sv-k9z4b';
+let pendingData = null;
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbw0PlcC7z3ixoFx86bu0Dyj2jn7pNasRzLmpjZFRTawzGzXxxp2-JRZg51XjS2XgvPgrg/exec';
 
 self.addEventListener('install', () => self.skipWaiting());
@@ -33,6 +34,14 @@ self.addEventListener('notificationclick', e => {
       await target.postMessage({ type: 'SENSOR_HIT', data });
       return target.focus();
     }
+    pendingData = data;
     return clients.openWindow(self.registration.scope);
   })());
+});
+
+self.addEventListener('message', e => {
+  if (e.data?.type === 'CLIENT_READY' && pendingData) {
+    e.source.postMessage({ type: 'SENSOR_HIT', data: pendingData });
+    pendingData = null;
+  }
 });
