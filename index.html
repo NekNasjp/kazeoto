@@ -229,20 +229,28 @@
   initSW();
   document.getElementById('btn-notif').addEventListener('click', subscribe);
 
-  navigator.serviceWorker?.ready.then(reg => {
-    reg.pushManager.getSubscription().then(sub => {
-      if (!sub) return;
-      const btn = document.getElementById('btn-notif');
-      btn.textContent = '✅ 通知有効';
-      btn.classList.add('subscribed');
-      // GAS シートから削除された場合に備えてサイレント再登録
-      const json = sub.toJSON();
-      fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'subscribe', endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth }),
-        headers: { 'Content-Type': 'text/plain' },
-      }).catch(() => {});
-    });
+  navigator.serviceWorker?.ready.then(async reg => {
+    let sub = await reg.pushManager.getSubscription();
+    // subscription が消えていて通知許可済みなら自動再購読
+    if (!sub && Notification.permission === 'granted') {
+      try {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      } catch (_) {}
+    }
+    if (!sub) return;
+    const btn = document.getElementById('btn-notif');
+    btn.textContent = '✅ 通知有効';
+    btn.classList.add('subscribed');
+    // GAS シートへ登録（シートから削除された場合・新デプロイ後も対応）
+    const json = sub.toJSON();
+    fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'subscribe', endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth }),
+      headers: { 'Content-Type': 'text/plain' },
+    }).catch(() => {});
   });
 </script>
 </body>
