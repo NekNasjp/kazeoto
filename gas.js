@@ -61,18 +61,25 @@ function checkNewRows() {
   const sheet = ss.getSheetByName(CONFIG.LOG_SHEET);
   if (!sheet) return;
 
-  const lastRow  = sheet.getLastRow();
-  const lastDone = parseInt(props.getProperty(CONFIG.LAST_ROW_KEY) || '1', 10);
-  if (lastRow <= lastDone) return;
+  const currentLastRow = sheet.getLastRow();
 
-  for (let row = lastDone + 1; row <= lastRow; row++) {
+  // 初回実行時: 既存行をスキップして現在の最終行を記録して終了
+  if (!props.getProperty(CONFIG.LAST_ROW_KEY)) {
+    props.setProperty(CONFIG.LAST_ROW_KEY, String(currentLastRow));
+    return;
+  }
+
+  const lastDone = parseInt(props.getProperty(CONFIG.LAST_ROW_KEY), 10);
+  if (currentLastRow <= lastDone) return;
+
+  for (let row = lastDone + 1; row <= currentLastRow; row++) {
     try {
       _processRow(sheet, row);
     } catch (err) {
-      console.error(`Row ${row} error: ${err}`);
+      console.error('Row ' + row + ' error: ' + err);
     }
   }
-  props.setProperty(CONFIG.LAST_ROW_KEY, String(lastRow));
+  props.setProperty(CONFIG.LAST_ROW_KEY, String(currentLastRow));
 }
 
 function _processRow(sheet, row) {
