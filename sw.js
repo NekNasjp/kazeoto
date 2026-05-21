@@ -1,8 +1,31 @@
-const CACHE_NAME = 'sv-k9z4c';
+const CACHE_NAME = 'sv-k9z4d';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbw0PlcC7z3ixoFx86bu0Dyj2jn7pNasRzLmpjZFRTawzGzXxxp2-JRZg51XjS2XgvPgrg/exec';
+const VAPID_PUBLIC_KEY = 'BO13tsTjl2y_vuX84DIzUbbWUgndqDKnvi7CF-9kkeK5ZBjeTRck4m5X8zKFLgN_-8erCil_UC4Ei1tE5fgmM-M';
+
+function _urlB64ToUint8Array(b64) {
+  const pad = b64 + '==='.slice((b64.length + 3) % 4);
+  const raw = atob(pad.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+
+// SW 更新で subscription endpoint が変わった場合に自動再登録
+self.addEventListener('pushsubscriptionchange', e => {
+  e.waitUntil((async () => {
+    const sub = await self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: _urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    const json = sub.toJSON();
+    await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'subscribe', endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth }),
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  })());
+});
 
 self.addEventListener('push', e => {
   e.waitUntil((async () => {
