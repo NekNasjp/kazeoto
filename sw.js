@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sv-k9z4e';
+const CACHE_NAME = 'sv-k9z4f';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzzqei1NIMm96JGLGadgSAulTMGexCDuNJOtqdhjyobTPsmMAJXLgjHF4ir2dVmEqXEQ/exec';
 const VAPID_PUBLIC_KEY = 'BO13tsTjl2y_vuX84DIzUbbWUgndqDKnvi7CF-9kkeK5ZBjeTRck4m5X8zKFLgN_-8erCil_UC4Ei1tE5fgmM-M';
 
@@ -27,15 +27,30 @@ self.addEventListener('pushsubscriptionchange', e => {
   })());
 });
 
+async function _dbg(msg, extra) {
+  const all = await clients.matchAll({ includeUncontrolled: true });
+  const payload = { type: 'DBG', msg, ts: Date.now(), ...extra };
+  all.forEach(c => c.postMessage(payload));
+}
+
 self.addEventListener('push', e => {
   e.waitUntil((async () => {
+    await _dbg('push received');
+
     let data = { active: false };
     try {
       const res = await fetch(`${GAS_URL}?action=latest&t=${Date.now()}`);
       data = await res.json();
-    } catch (_) {}
+    } catch (err) {
+      await _dbg('latest fetch error', { err: String(err) });
+    }
 
-    if (!data.active) return;
+    await _dbg('latest result', { active: data.active, ts: data.ts, bank: data.bank });
+
+    if (!data.active) {
+      await _dbg('notif skipped');
+      return;
+    }
 
     await self.registration.showNotification('⚡ センサー発動', {
       body: `${data.bank}  風${data.wind}m/s  天運${data.tenun}`,
@@ -43,6 +58,7 @@ self.addEventListener('push', e => {
       requireInteraction: true,
       tag: 'sensor-alert',
     });
+    await _dbg('notif shown');
   })());
 });
 

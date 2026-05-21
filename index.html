@@ -80,6 +80,16 @@
       padding: 11px; background: var(--muted); border: 1px solid var(--border);
       border-radius: 8px; color: var(--sub); font-size: 13px; cursor: pointer; }
     #btn-notif.subscribed { color: var(--green); border-color: var(--green); }
+
+    /* ── debug log ── */
+    #dbg-wrap { padding: 0 20px 20px; max-width: 460px; margin: 0 auto; width: 100%; }
+    #dbg-toggle { width: 100%; padding: 8px; background: #000; border: 1px solid #333;
+      border-radius: 6px 6px 0 0; color: #555; font-size: 11px; cursor: pointer;
+      text-align: left; display: flex; justify-content: space-between; }
+    #dbg-toggle.open { border-bottom: none; color: #888; }
+    #dbg-log { display: none; background: #000; border: 1px solid #333; border-top: none;
+      border-radius: 0 0 6px 6px; padding: 8px; height: 180px; overflow-y: auto;
+      font-size: 10px; font-family: monospace; color: #0f0; word-break: break-all; }
   </style>
 </head>
 <body>
@@ -128,28 +138,62 @@
   <div id="notif-bar">
     <button id="btn-notif">🔔 通知を有効にする</button>
   </div>
+  <div id="dbg-wrap">
+    <button id="dbg-toggle">🔍 Debug Log <span id="dbg-arrow">▶</span></button>
+    <div id="dbg-log"></div>
+  </div>
 </div>
 
 <script>
   const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzzqei1NIMm96JGLGadgSAulTMGexCDuNJOtqdhjyobTPsmMAJXLgjHF4ir2dVmEqXEQ/exec';
+
+  // ── Debug Log ──
+  function dbg(msg) {
+    const el = document.getElementById('dbg-log');
+    if (!el) return;
+    const t = new Date().toLocaleTimeString('ja-JP', { hour12: false });
+    el.textContent = `[${t}] ${msg}\n` + el.textContent;
+  }
+  document.getElementById('dbg-toggle').addEventListener('click', () => {
+    const log = document.getElementById('dbg-log');
+    const arrow = document.getElementById('dbg-arrow');
+    const btn = document.getElementById('dbg-toggle');
+    const open = log.style.display === 'block';
+    log.style.display = open ? 'none' : 'block';
+    arrow.textContent = open ? '▶' : '▼';
+    btn.classList.toggle('open', !open);
+  });
 
   // ── SW登録 ──
   async function initSW() {
     if (!('serviceWorker' in navigator)) return;
     try {
       await navigator.serviceWorker.register('./sw.js');
+      dbg('SW registration OK');
       navigator.serviceWorker.addEventListener('message', e => {
-        if (e.data?.type === 'SENSOR_HIT') showPanel(e.data.data);
+        if (e.data?.type === 'SENSOR_HIT') {
+          dbg(`SENSOR_HIT: ${JSON.stringify(e.data.data)}`);
+          showPanel(e.data.data);
+        }
+        if (e.data?.type === 'DBG') {
+          const d = e.data;
+          dbg(`[SW] ${d.msg}${d.active !== undefined ? ` active=${d.active}` : ''}${d.ts ? ` ts=${d.ts}` : ''}${d.bank ? ` bank=${d.bank}` : ''}${d.err ? ` err=${d.err}` : ''}`);
+        }
       });
       // 通知タップ起動チェック: GAS 最新データが10分以内なら発動パネルを表示
       try {
         const res  = await fetch(`${GAS_URL}?action=latest&t=${Date.now()}`);
         const data = await res.json();
+        dbg(`latest: active=${data.active} ts=${data.ts} bank=${data.bank}`);
         if (data.active && data.ts && (Date.now() - new Date(data.ts).getTime() < 10 * 60 * 1000)) {
           showPanel(data);
         }
-      } catch (_) {}
-    } catch (_) {}
+      } catch (err) {
+        dbg(`latest fetch error: ${err}`);
+      }
+    } catch (err) {
+      dbg(`SW registration FAIL: ${err}`);
+    }
   }
 
   // ── Push購読 ──
@@ -169,15 +213,23 @@
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
+      try {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+        dbg(`subscribed: ...${sub.endpoint.slice(-20)}`);
+      } catch (err) {
+        dbg(`subscribe FAIL: ${err}`);
+        return;
+      }
+    } else {
+      dbg(`existing sub: ...${sub.endpoint.slice(-20)}`);
     }
 
     const json = sub.toJSON();
     try {
-      await fetch(GAS_URL, {
+      const res = await fetch(GAS_URL, {
         method: 'POST',
         body: JSON.stringify({
           action: 'subscribe',
@@ -185,9 +237,13 @@
           p256dh:   json.keys.p256dh,
           auth:     json.keys.auth,
         }),
-        headers: { 'Content-Type': 'text/plain' }, // GAS CORS対策
+        headers: { 'Content-Type': 'text/plain' },
       });
-    } catch (_) {}
+      const text = await res.text();
+      dbg(`GAS POST ${res.status}: ${text.slice(0, 80)}`);
+    } catch (err) {
+      dbg(`GAS POST error: ${err}`);
+    }
 
     const btn = document.getElementById('btn-notif');
     btn.textContent = '✅ 通知有効';
@@ -231,25 +287,37 @@
 
   navigator.serviceWorker?.ready.then(async reg => {
     if (Notification.permission !== 'granted') return;
-    // 失効 endpoint の 410 ループを断ち切るため既存を破棄して新規作成
     const old = await reg.pushManager.getSubscription();
-    if (old) await old.unsubscribe().catch(() => {});
+    if (old) {
+      await old.unsubscribe().catch(() => {});
+      dbg('old sub unsubscribed');
+    }
     let sub;
     try {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
       });
-    } catch (_) { return; }
+      dbg(`auto-sub OK: ...${sub.endpoint.slice(-20)}`);
+    } catch (err) {
+      dbg(`auto-sub FAIL: ${err}`);
+      return;
+    }
     const btn = document.getElementById('btn-notif');
     btn.textContent = '✅ 通知有効';
     btn.classList.add('subscribed');
     const json = sub.toJSON();
-    fetch(GAS_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'subscribe', endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth }),
-      headers: { 'Content-Type': 'text/plain' },
-    }).catch(() => {});
+    try {
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'subscribe', endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth }),
+        headers: { 'Content-Type': 'text/plain' },
+      });
+      const text = await res.text();
+      dbg(`auto-sub GAS POST ${res.status}: ${text.slice(0, 80)}`);
+    } catch (err) {
+      dbg(`auto-sub GAS POST error: ${err}`);
+    }
   });
 </script>
 </body>
