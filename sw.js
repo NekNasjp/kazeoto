@@ -1,5 +1,5 @@
 const CACHE_NAME = 'sv-k9z4a';
-const GAS_URL = '__GAS_WEB_APP_URL__'; // デプロイ後に置換
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwAvGJepdKwUu1jilPR52HQXPbXyXXw0l2wYOU5-LANRLvdJduj_1vJ1pOuo8dyu55G/exec';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(clients.claim()));
