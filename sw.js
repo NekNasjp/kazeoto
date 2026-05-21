@@ -1,5 +1,5 @@
 const CACHE_NAME = 'sv-k9z4a';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwAvGJepdKwUu1jilPR52HQXPbXyXXw0l2wYOU5-LANRLvdJduj_1vJ1pOuo8dyu55G/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbw0PlcC7z3ixoFx86bu0Dyj2jn7pNasRzLmpjZFRTawzGzXxxp2-JRZg51XjS2XgvPgrg/exec';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(clients.claim()));
