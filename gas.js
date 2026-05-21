@@ -7,8 +7,8 @@
 
 // ─── 設定 ───────────────────────────────────────────
 const CONFIG = {
-  SHEET_ID:       '__YOUR_SPREADSHEET_ID__',  // 自在律のログシートID
-  LOG_SHEET:      'log',                       // ログシート名
+  SHEET_ID:       '1S9U_AR4dM8tKTUTKx3_wAJBLW5x4zB3h7annjv7z8iw',
+  LOG_SHEET:      '係数サマリー',
   SUB_SHEET:      'subscriptions',             // 購読シート名
   LAST_ROW_KEY:   'lastProcessedRow',          // Script Properties キー
   LATEST_KEY:     'latestSensorData',          // 最新センサーデータ
@@ -76,10 +76,14 @@ function checkNewRows() {
 }
 
 function _processRow(sheet, row) {
-  const vals     = sheet.getRange(row, 1, 1, 5).getValues()[0];
-  const raceInfo = _tryParse(vals[2]); // C列
-  const snapshot = _tryParse(vals[3]); // D列
-  const bets     = _tryParse(vals[4]); // E列
+  // F列（index 5）の完全ログJSONを取得
+  const raw = sheet.getRange(row, 6).getValue();
+  const log = _tryParse(raw);
+  if (!log) return;
+
+  const raceInfo = log.race_info;
+  const snapshot = log.snapshot;
+  const prediction = log.prediction;
   if (!raceInfo || !snapshot) return;
 
   // 条件判定
@@ -88,22 +92,22 @@ function _processRow(sheet, row) {
   const tenun     = raceInfo.tenun;
 
   const isHit =
-    grade     === 'a-kyu'  &&
-    windSpeed >= 1.5       &&
-    windSpeed <  3.1       &&
+    grade     === 'a-kyu' &&
+    windSpeed >= 1.5      &&
+    windSpeed <  3.1      &&
     tenun     === 33;
 
   if (!isHit) return;
 
-  // スコアからランキング生成
+  // R1/R2/R3: snapshot.scores.final.seiten を値の降順ソート
   const seiten  = snapshot?.scores?.final?.seiten || {};
   const ranking = Object.entries(seiten)
     .sort((a, b) => b[1] - a[1])
     .map(e => e[0]);
   const R1 = ranking[0], R2 = ranking[1], R3 = ranking[2];
 
-  // 特異点L
-  const koutenHtml = bets?.kouten || '';
+  // L: prediction.kouten から正規表現抽出
+  const koutenHtml = prediction?.kouten || '';
   const lMatch     = koutenHtml.match(/特異点：(\d+)/);
   const L          = lMatch ? lMatch[1] : ranking[3] || '?';
 
