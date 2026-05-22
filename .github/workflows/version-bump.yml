@@ -1,0 +1,36 @@
+name: Version Bump
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  bump:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump patch version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          IFS='.' read -ra PARTS <<< "$VERSION"
+          NEW_VERSION="${PARTS[0]}.${PARTS[1]}.$((${PARTS[2]} + 1))"
+          node -e "
+            const fs = require('fs');
+            const p = require('./package.json');
+            p.version = '$NEW_VERSION';
+            fs.writeFileSync('./package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+          sed -i "s|v[0-9]\+\.[0-9]\+\.[0-9]\+<\/span>|v${NEW_VERSION}<\/span>|g" index.html
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json index.html
+          git diff --staged --quiet || git commit -m "chore: bump version to v${{ env.NEW_VERSION }} [skip ci]"
+          git push
