@@ -30,6 +30,7 @@
     .hdr-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sub); }
     .hdr-dot.active { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
     header h1 { font-size: 15px; font-weight: 500; color: var(--sub); letter-spacing: .04em; }
+    #app-ver { font-size: 10px; color: var(--sub); opacity: .6; margin-left: 4px; }
 
     /* ── main ── */
     main { flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -96,7 +97,7 @@
 <div id="app">
   <header>
     <div class="hdr-dot" id="hdr-dot"></div>
-    <h1>Signal Board</h1>
+    <h1>Signal Board<span id="app-ver">v1.0.0</span></h1>
   </header>
 
   <main>
@@ -145,7 +146,7 @@
 </div>
 
 <script>
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbzzzqei1NIMm96JGLGadgSAulTMGexCDuNJOtqdhjyobTPsmMAJXLgjHF4ir2dVmEqXEQ/exec';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbyr7hgE9PQ3QfZSV9ACrD1bVmURVNyJn45pqYBfphNLsCUhZ4Ob1a3duiTaPAZJKtKhrA/exec';
 
   // ── Debug Log ──
   function dbg(msg) {
