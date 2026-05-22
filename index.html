@@ -288,21 +288,20 @@
 
   navigator.serviceWorker?.ready.then(async reg => {
     if (Notification.permission !== 'granted') return;
-    const old = await reg.pushManager.getSubscription();
-    if (old) {
-      await old.unsubscribe().catch(() => {});
-      dbg('old sub unsubscribed');
-    }
-    let sub;
-    try {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
-      dbg(`auto-sub OK: ...${sub.endpoint.slice(-20)}`);
-    } catch (err) {
-      dbg(`auto-sub FAIL: ${err}`);
-      return;
+    let sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      dbg(`existing sub reused: ...${sub.endpoint.slice(-20)}`);
+    } else {
+      try {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+        dbg(`auto-sub new: ...${sub.endpoint.slice(-20)}`);
+      } catch (err) {
+        dbg(`auto-sub FAIL: ${err}`);
+        return;
+      }
     }
     const btn = document.getElementById('btn-notif');
     btn.textContent = '✅ 通知有効';
