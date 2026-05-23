@@ -255,20 +255,20 @@ function _createVapidJwt(endpoint) {
 }
 
 // ─── P-256 ECDSA（RFC 6979、GAS V8 BigInt）───────────
-// 修正: Uint8Array → 通常 Array 統一 / BigInt literals / padding修正 / sha256明示バイト変換
+// 修正: Uint8Array → 通常 Array 統一 / BigInt() コンストラクタ / padding修正 / sha256明示バイト変換
 function _p256Sign(privKeyB64u, message) {
-  // P-256 曲線パラメータ（BigInt literals）
-  const p  = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFn;
-  const a  = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFCn;
-  const n  = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551n;
-  const Gx = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296n;
-  const Gy = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5n;
+  // P-256 曲線パラメータ
+  const p  = BigInt('0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF');
+  const a  = BigInt('0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC');
+  const n  = BigInt('0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551');
+  const Gx = BigInt('0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296');
+  const Gy = BigInt('0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5');
 
   // フィールド演算
-  const mod = (x, m) => { const r = x % m; return r < 0n ? r + m : r; };
+  const mod = (x, m) => { const r = x % m; return r < BigInt(0) ? r + m : r; };
   const inv = (x, m) => {
-    let [a, b, u, v] = [mod(x, m), m, 1n, 0n];
-    while (a !== 0n) {
+    let [a, b, u, v] = [mod(x, m), m, BigInt(1), BigInt(0)];
+    while (a !== BigInt(0)) {
       const q = b / a;
       [a, b] = [b - q * a, a];
       [u, v] = [v - q * u, u];
@@ -284,7 +284,7 @@ function _p256Sign(privKeyB64u, message) {
     let lam;
     if (x1 === x2) {
       if (y1 !== y2) return null;
-      lam = mod(3n * x1 * x1 + a, p) * inv(mod(2n * y1, p), p) % p;
+      lam = mod(BigInt(3) * x1 * x1 + a, p) * inv(mod(BigInt(2) * y1, p), p) % p;
     } else {
       lam = mod(y2 - y1, p) * inv(mod(x2 - x1, p), p) % p;
     }
@@ -293,7 +293,7 @@ function _p256Sign(privKeyB64u, message) {
   };
   const mul = (k, P) => {
     let R = null, Q = [...P];
-    for (; k > 0n; k >>= 1n) { if (k & 1n) R = add(R, Q); Q = add(Q, Q); }
+    for (; k > BigInt(0); k >>= BigInt(1)) { if (k & BigInt(1)) R = add(R, Q); Q = add(Q, Q); }
     return R;
   };
 
@@ -337,7 +337,7 @@ function _p256Sign(privKeyB64u, message) {
     for (let i = 0; i < 100; i++) {
       V = hmac(K, V);
       const k = toBI(V);
-      if (k >= 1n && k < n) return k;
+      if (k >= BigInt(1) && k < n) return k;
       K = hmac(K, cat(V, [0]));
       V = hmac(K, V);
     }
