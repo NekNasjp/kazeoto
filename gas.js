@@ -225,128 +225,124 @@ function _sendVapidPush(endpoint) {
   return resp.getResponseCode();
 }
 
-// ─── VAPID JWT 生成（P-256 ECDSA、GAS V8 BigInt使用）───
+// ─── VAPID JWT 生成 ──────────────────────────────────
 function _createVapidJwt(endpoint) {
   const origin = endpoint.match(/^https?:\/\/[^\/]+/)[0];
   const now    = Math.floor(Date.now() / 1000);
-  const _b64u  = s => Utilities.base64EncodeWebSafe(s).replace(/=+$/, '');
+  const b64u   = s => Utilities.base64EncodeWebSafe(s).replace(/=+$/, '');
 
-  const header  = _b64u(JSON.stringify({ typ: 'JWT', alg: 'ES256' }));
-  const payload = _b64u(JSON.stringify({
+  const header  = b64u(JSON.stringify({ typ: 'JWT', alg: 'ES256' }));
+  const payload = b64u(JSON.stringify({
     aud: origin,
     exp: now + 43200,
     sub: CONFIG.VAPID_MAILTO,
   }));
-  const signingInput = `${header}.${payload}`;
-  const signature    = _p256Sign(CONFIG.VAPID_PRIVATE, signingInput);
-
-  return { jwt: `${signingInput}.${signature}`, pubKey: CONFIG.VAPID_PUBLIC };
+  const sigInput = `${header}.${payload}`;
+  return { jwt: `${sigInput}.${_p256Sign(CONFIG.VAPID_PRIVATE, sigInput)}`, pubKey: CONFIG.VAPID_PUBLIC };
 }
 
 // ─── P-256 ECDSA（RFC 6979、GAS V8 BigInt）───────────
-function _p256Sign(privateKeyB64u, message) {
-  // P-256 パラメータ
-  const p  = BigInt('0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF');
-  const a  = p - BigInt(3);
-  const n  = BigInt('0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551');
-  const Gx = BigInt('0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296');
-  const Gy = BigInt('0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5');
-  const G  = [Gx, Gy];
+// 修正: Uint8Array → 通常 Array 統一 / BigInt literals / padding修正 / sha256明示バイト変換
+function _p256Sign(privKeyB64u, message) {
+  // P-256 曲線パラメータ（BigInt literals）
+  const p  = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFn;
+  const a  = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFCn;
+  const n  = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551n;
+  const Gx = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296n;
+  const Gy = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5n;
 
   // フィールド演算
-  const _fm = (x, m) => { let r = x % m; return r < BigInt(0) ? r + m : r; };
-  const _fi = (x, m) => {
-    let [r0, r1, s0, s1] = [_fm(x, m), m, BigInt(1), BigInt(0)];
-    while (r1 !== BigInt(0)) {
-      const q = r0 / r1;
-      [r0, r1] = [r1, r0 - q * r1];
-      [s0, s1] = [s1, s0 - q * s1];
+  const mod = (x, m) => { const r = x % m; return r < 0n ? r + m : r; };
+  const inv = (x, m) => {
+    let [a, b, u, v] = [mod(x, m), m, 1n, 0n];
+    while (a !== 0n) {
+      const q = b / a;
+      [a, b] = [b - q * a, a];
+      [u, v] = [v - q * u, u];
     }
-    return _fm(s0, m);
+    return mod(v, m);
   };
 
   // 楕円曲線演算
-  const _add = (P, Q) => {
-    if (!P) return Q; if (!Q) return P;
+  const add = (P, Q) => {
+    if (!P) return Q;
+    if (!Q) return P;
     const [x1, y1] = P, [x2, y2] = Q;
+    let lam;
     if (x1 === x2) {
       if (y1 !== y2) return null;
-      const m = _fm(BigInt(3) * x1 * x1 + a, p) * _fi(BigInt(2) * y1, p) % p;
-      const x3 = _fm(m * m - BigInt(2) * x1, p);
-      return [x3, _fm(m * (x1 - x3) - y1, p)];
+      lam = mod(3n * x1 * x1 + a, p) * inv(mod(2n * y1, p), p) % p;
+    } else {
+      lam = mod(y2 - y1, p) * inv(mod(x2 - x1, p), p) % p;
     }
-    const m  = _fm(y2 - y1, p) * _fi(_fm(x2 - x1, p), p) % p;
-    const x3 = _fm(m * m - x1 - x2, p);
-    return [x3, _fm(m * (x1 - x3) - y1, p)];
+    const x3 = mod(lam * lam - x1 - x2, p);
+    return [x3, mod(lam * (x1 - x3) - y1, p)];
   };
-  const _mul = (k, P) => {
-    let R = null, Q = P;
-    while (k > BigInt(0)) { if (k & BigInt(1)) R = _add(R, Q); Q = _add(Q, Q); k >>= BigInt(1); }
+  const mul = (k, P) => {
+    let R = null, Q = [...P];
+    for (; k > 0n; k >>= 1n) { if (k & 1n) R = add(R, Q); Q = add(Q, Q); }
     return R;
   };
 
-  // バイト変換ユーティリティ
-  const _toHex = b => (b & 0xFF).toString(16).padStart(2, '0');
-  const _bytes32 = v => {
+  // バイト変換（通常 Array のみ使用）
+  const b64uDec = s => {
+    const b = s.replace(/-/g, '+').replace(/_/g, '/');
+    const r = b.length % 4;
+    return Array.from(Utilities.base64Decode(r ? b + '='.repeat(4 - r) : b)).map(x => x & 0xFF);
+  };
+  const toBI   = arr => BigInt('0x' + arr.map(b => b.toString(16).padStart(2, '0')).join(''));
+  const to32B  = v   => {
     const h = v.toString(16).padStart(64, '0');
-    return new Uint8Array(Array.from({length: 32}, (_, i) => parseInt(h.slice(i*2, i*2+2), 16)));
+    return Array.from({length: 32}, (_, i) => parseInt(h.slice(i * 2, i * 2 + 2), 16));
   };
-  const _fromBytes = arr => BigInt('0x' + Array.from(arr).map(_toHex).join(''));
-  const _cat = (...arrs) => {
-    const r = new Uint8Array(arrs.reduce((s, a) => s + a.length, 0));
-    let o = 0; arrs.forEach(a => { r.set(a, o); o += a.length; });
-    return r;
-  };
+  const cat    = (...a) => [].concat(...a);
 
-  // GAS HMAC-SHA256（signed byte → unsigned byte 変換必須）
-  const _hmac = (key, data) => {
-    const k = Array.from(key).map(b => b > 127 ? b - 256 : b);
-    const d = Array.from(data).map(b => b > 127 ? b - 256 : b);
-    return Uint8Array.from(Utilities.computeHmacSha256Signature(d, k).map(b => b & 0xFF));
-  };
+  // HMAC-SHA256（GAS signed byte 変換）
+  const hmac = (key, data) => Array.from(
+    Utilities.computeHmacSha256Signature(
+      data.map(b => b > 127 ? b - 256 : b),
+      key.map(b => b > 127 ? b - 256 : b)
+    )
+  ).map(b => b & 0xFF);
 
-  // GAS SHA-256
-  const _sha256 = msg => {
-    const raw = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, msg);
-    return Uint8Array.from(raw.map(b => b & 0xFF));
-  };
-
-  // base64url デコード
-  const _b64uDec = s => {
-    const pad = s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4);
-    return Uint8Array.from(Utilities.base64Decode(pad));
-  };
+  // SHA-256（string → ASCII bytes → hash）
+  const sha256 = str => Array.from(
+    Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      str.split('').map(c => c.charCodeAt(0) > 127 ? c.charCodeAt(0) - 256 : c.charCodeAt(0))
+    )
+  ).map(b => b & 0xFF);
 
   // RFC 6979 決定論的 k 生成
-  const _rfcK = (privB, hashB) => {
-    let V = new Uint8Array(32).fill(1);
-    let K = new Uint8Array(32).fill(0);
-    K = _hmac(K, _cat(V, new Uint8Array([0]), privB, hashB));
-    V = _hmac(K, V);
-    K = _hmac(K, _cat(V, new Uint8Array([1]), privB, hashB));
-    V = _hmac(K, V);
+  const rfcK = (dB, hB) => {
+    let V = new Array(32).fill(1);
+    let K = new Array(32).fill(0);
+    K = hmac(K, cat(V, [0], dB, hB));
+    V = hmac(K, V);
+    K = hmac(K, cat(V, [1], dB, hB));
+    V = hmac(K, V);
     for (let i = 0; i < 100; i++) {
-      V = _hmac(K, V);
-      const k = _fromBytes(V);
-      if (k >= BigInt(1) && k < n) return k;
-      K = _hmac(K, _cat(V, new Uint8Array([0])));
-      V = _hmac(K, V);
+      V = hmac(K, V);
+      const k = toBI(V);
+      if (k >= 1n && k < n) return k;
+      K = hmac(K, cat(V, [0]));
+      V = hmac(K, V);
     }
-    throw new Error('RFC 6979: k generation failed');
+    throw new Error('RFC 6979 failed');
   };
 
-  // 署名
-  const privKey = _fromBytes(_b64uDec(privateKeyB64u));
-  const hashB   = _sha256(message);
-  const z       = _fromBytes(hashB);
-  const k       = _rfcK(_bytes32(privKey), hashB);
-  const [rx]    = _mul(k, G);
-  const r       = _fm(rx, n);
-  const s       = _fm(_fi(k, n) * _fm(z + r * privKey, n), n);
+  // 署名本体
+  const dB  = b64uDec(privKeyB64u);
+  const hB  = sha256(message);
+  const d   = toBI(dB);
+  const z   = toBI(hB);
+  const k   = rfcK(dB, hB);
+  const [rx] = mul(k, [Gx, Gy]);
+  const r   = mod(rx, n);
+  const s   = mod(inv(k, n) * mod(z + r * d, n), n);
 
-  // 署名バイト (r || s) 64bytes → base64url
-  const sig = _cat(_bytes32(r), _bytes32(s));
-  return Utilities.base64EncodeWebSafe(sig).replace(/=+$/, '');
+  // r || s (64 bytes) → base64url
+  return Utilities.base64EncodeWebSafe(to32B(r).concat(to32B(s))).replace(/=+$/, '');
 }
 
 // ─── ユーティリティ ───────────────────────────────────
