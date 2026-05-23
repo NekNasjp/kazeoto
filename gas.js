@@ -206,6 +206,10 @@ function _sendPushToAll(payload) {
       if (code === 410 || code === 404) failed.push(i + 2); // 1-indexed + header
     } catch (err) {
       console.error(`Push failed for row ${i + 2}: ${err}`);
+      PropertiesService.getScriptProperties().setProperty(
+        CONFIG.PUSH_STATUS_KEY,
+        JSON.stringify({ code: 0, body: String(err), endpoint: endpoint.slice(-30), ts: new Date().toISOString() })
+      );
     }
   });
 
