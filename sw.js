@@ -1,5 +1,5 @@
 const CACHE_NAME = 'sv-k9z4f';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzjdn4VUKuQDLmB5efXaDDjYK-43k35p6I8sYDBRhh5DHyb3TbUitth2zARgwEerv4f/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwGbJhEU7-ZT1Rhf6QATuWjQ412doyWLcDUSkZe8VuH6S2fYFV8gMA05kwaPnceZ0SsAQ/exec';
 const VAPID_PUBLIC_KEY = 'BO13tsTjl2y_vuX84DIzUbbWUgndqDKnvi7CF-9kkeK5ZBjeTRck4m5X8zKFLgN_-8erCil_UC4Ei1tE5fgmM-M';
 
 function _urlB64ToUint8Array(b64) {
