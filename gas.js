@@ -225,7 +225,6 @@ function _sendVapidPush(endpoint) {
       'Authorization':  `vapid t=${jwt},k=${pubKey}`,
       'TTL':            '86400',
       'Content-Type':   'application/octet-stream',
-      'Content-Length': '0',
     },
     muteHttpExceptions: true,
   });
