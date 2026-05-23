@@ -16,6 +16,7 @@ const CONFIG = {
   VAPID_PRIVATE:  'lOxrs0RwvXg4pbwmchDSlX_HJvNj8yKtUqUdLwg7Ves',
   VAPID_PUBLIC:   'BO13tsTjl2y_vuX84DIzUbbWUgndqDKnvi7CF-9kkeK5ZBjeTRck4m5X8zKFLgN_-8erCil_UC4Ei1tE5fgmM-M',
   VAPID_MAILTO:   'mailto:noreply@example.com',
+  PUSH_STATUS_KEY: 'lastPushStatus',
 };
 
 // ─── doPost: 購読エンドポイントを保存 ───────────────
@@ -81,12 +82,14 @@ function doGet(e) {
     const raw      = props.getProperty(CONFIG.LATEST_KEY);
     const triggerCount = ScriptApp.getProjectTriggers()
       .filter(t => t.getHandlerFunction() === 'checkNewRows').length;
+    const pushStatusRaw = props.getProperty(CONFIG.PUSH_STATUS_KEY);
     return _json({
       lastProcessedRow:  lastRow ? parseInt(lastRow) : null,
       currentLastRow:    logSheet ? logSheet.getLastRow() : null,
       subscriptionCount: subCount,
       triggerCount,
       latestSensorData:  raw ? JSON.parse(raw) : null,
+      lastPushStatus:    pushStatusRaw ? JSON.parse(pushStatusRaw) : null,
     });
   }
 
@@ -222,7 +225,13 @@ function _sendVapidPush(endpoint) {
     },
     muteHttpExceptions: true,
   });
-  return resp.getResponseCode();
+  const code = resp.getResponseCode();
+  const body = resp.getContentText().slice(0, 200);
+  PropertiesService.getScriptProperties().setProperty(
+    CONFIG.PUSH_STATUS_KEY,
+    JSON.stringify({ code, body, endpoint: endpoint.slice(-30), ts: new Date().toISOString() })
+  );
+  return code;
 }
 
 // ─── VAPID JWT 生成 ──────────────────────────────────
