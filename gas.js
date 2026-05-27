@@ -111,7 +111,6 @@ function checkNewRows() {
     return;
   }
 
-  _resetLastRow(props, currentLastRow);
   const lastDone = parseInt(props.getProperty(CONFIG.LAST_ROW_KEY), 10);
   if (currentLastRow <= lastDone) return;
 
@@ -366,12 +365,3 @@ function _tryParse(str) {
 }
 function _ok(obj)   { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 function _json(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
-
-// ======== テスト用ここから（完了後この関数と上記呼び出し1行を削除）========
-function _resetLastRow(props, currentLastRow) {
-  const lastDone = parseInt(props.getProperty(CONFIG.LAST_ROW_KEY), 10);
-  if (currentLastRow < lastDone) {
-    props.setProperty(CONFIG.LAST_ROW_KEY, String(currentLastRow));
-  }
-}
-// ======== テスト用ここまで ========
