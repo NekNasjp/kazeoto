@@ -113,7 +113,7 @@
 
     <div id="panel">
       <div class="panel-head">
-        <div class="panel-title">⚡ センサー発動</div>
+        <div class="panel-title" id="panel-title">⚡ センサー発動</div>
         <div class="panel-meta">
           <span id="meta-bank"></span>
           <span id="meta-wind"></span>
@@ -257,7 +257,9 @@
     document.getElementById('panel').style.display    = 'block';
     document.getElementById('hdr-dot').classList.add('active');
 
-    document.getElementById('meta-bank').textContent  = data.bank  || '';
+    const raceLabel = data.raceNo ? `${data.bank}  ${data.raceNo}R` : data.bank;
+    document.getElementById('panel-title').textContent = `⚡ ${raceLabel}`;
+    document.getElementById('meta-bank').textContent   = data.bank  || '';
     document.getElementById('meta-wind').textContent  = `風 ${data.wind}m/s`;
     document.getElementById('meta-tenun').textContent = `天運 ${data.tenun}`;
 

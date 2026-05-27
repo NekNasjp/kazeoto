@@ -170,9 +170,12 @@ function _processRow(sheet, row) {
     `${R2}-${R1}-${L}`,
   ];
 
+  const raceNo = raceInfo.race_id ? parseInt(raceInfo.race_id.slice(-2), 10) : null;
+
   const payload = {
     active: true,
     bank:   raceInfo.bank || '',
+    raceNo,
     wind:   windSpeed,
     tenun,
     R1, R2, R3, L,

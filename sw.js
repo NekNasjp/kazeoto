@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sv-k9z4f';
+const CACHE_NAME = 'sv-k9z4f2';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbz9SsFtzdNeUQ6RqhyT6XZ4IslXSB0MgcnYbHsVteCgBnZjGpXJqmx38h7a71WQy1Mzxg/exec';
 const VAPID_PUBLIC_KEY = 'BO13tsTjl2y_vuX84DIzUbbWUgndqDKnvi7CF-9kkeK5ZBjeTRck4m5X8zKFLgN_-8erCil_UC4Ei1tE5fgmM-M';
 
@@ -52,8 +52,9 @@ self.addEventListener('push', e => {
       return;
     }
 
-    await self.registration.showNotification('⚡ センサー発動', {
-      body: `${data.bank}  風${data.wind}m/s  天運${data.tenun}`,
+    const raceLabel = data.raceNo ? `${data.bank}  ${data.raceNo}R` : data.bank;
+    await self.registration.showNotification(`⚡ ${raceLabel}`, {
+      body: `風${data.wind}m/s  天運${data.tenun}`,
       data,
       requireInteraction: true,
       tag: 'sensor-alert',
