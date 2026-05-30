@@ -153,12 +153,13 @@ function _processRow(sheet, row) {
   const ranking = Object.entries(seiten)
     .sort((a, b) => b[1] - a[1])
     .map(e => e[0]);
-  const R1 = ranking[0], R2 = ranking[1], R3 = ranking[2];
+  const R1 = ranking[0], R2 = ranking[1], R3 = ranking[2], R4 = ranking[3];
 
   // L: prediction.kouten から正規表現抽出
   const koutenHtml = prediction?.kouten || '';
   const lMatch     = koutenHtml.match(/特異点：(\d+)/);
-  const L          = lMatch ? lMatch[1] : ranking[3] || '?';
+  const Lraw       = lMatch ? lMatch[1] : ranking[3] || '?';
+  const L          = (Lraw === R3) ? (R4 || '?') : Lraw;
 
   // 買い目5点
   const betsResult = [
