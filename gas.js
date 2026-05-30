@@ -148,18 +148,20 @@ function _processRow(sheet, row) {
 
   if (!isHit) return;
 
-  // R1/R2/R3: snapshot.scores.final.seiten を値の降順ソート
-  const seiten  = snapshot?.scores?.final?.seiten || {};
-  const ranking = Object.entries(seiten)
-    .sort((a, b) => b[1] - a[1])
-    .map(e => e[0]);
-  const R1 = ranking[0], R2 = ranking[1], R3 = ranking[2], R4 = ranking[3];
+  // R1/R2/R3: prediction.seiten の三連単1行目をパース
+  const seitenHtml  = prediction?.seiten || '';
+  const seitenMatch = seitenHtml.match(/<li>(\d+)-(\d+)-(\d+)<\/li>/);
+  const R1 = seitenMatch[1], R2 = seitenMatch[2], R3 = seitenMatch[3];
 
-  // L: prediction.kouten から正規表現抽出
+  // L: prediction.kouten から特異点を抽出
   const koutenHtml = prediction?.kouten || '';
   const lMatch     = koutenHtml.match(/特異点：(\d+)/);
-  const Lraw       = lMatch ? lMatch[1] : ranking[3] || '?';
-  const L          = (Lraw === R3) ? (R4 || '?') : Lraw;
+  const Lraw       = lMatch[1];
+  const L          = (Lraw === R3)
+    ? Object.entries(snapshot.scores.final.kouten)
+        .sort((a, b) => b[1] - a[1])
+        .map(e => e[0])[3]
+    : Lraw;
 
   // 買い目5点
   const betsResult = [
