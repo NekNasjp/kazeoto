@@ -186,7 +186,7 @@
         const res  = await fetch(`${GAS_URL}?action=latest&t=${Date.now()}`);
         const data = await res.json();
         dbg(`latest: active=${data.active} ts=${data.ts} bank=${data.bank}`);
-        if (data.active && data.ts && (Date.now() - new Date(data.ts).getTime() < 10 * 60 * 1000)) {
+        if (data.active) {
           showPanel(data);
         }
       } catch (err) {
